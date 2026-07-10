@@ -8,5 +8,5 @@ export const subjectColors = [
   "#E67E00",
   "#BE185D",
   "#05644D",
-  "#2455D6",
+  // "#2455D6",
 ];
