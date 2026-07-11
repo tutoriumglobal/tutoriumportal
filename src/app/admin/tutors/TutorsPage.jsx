@@ -1,119 +1,578 @@
 "use client";
 
-import { useState } from "react";
-import { FaPlus, FaSearch, FaGraduationCap } from "react-icons/fa";
-import TutorTable from "./TutorTable";
-import AddTutorModal from "./AddTutorModal";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-const initialTutors = [
-  {
-    name: "Dr. Rachel Kim",
-    email: "r.kim@tutorium.com",
-    availability: "Mon–Fri, 3–8 PM",
-    rating: "4.9",
-    sessions: "142",
-    status: "active",
-    image: "https://i.pravatar.cc/100?img=47",
-    subjects: ["Mathematics", "Physics"],
-  },
-  {
-    name: "James O'Brien",
-    email: "j.obrien@tutorium.com",
-    availability: "Mon–Wed, Sat",
-    rating: "4.8",
-    sessions: "98",
-    status: "active",
-    image: "https://i.pravatar.cc/100?img=12",
-    subjects: ["English", "History"],
-  },
-  {
-    name: "Priya Sharma",
-    email: "p.sharma@tutorium.com",
-    availability: "Tue–Sat, 2–7 PM",
-    rating: "4.95",
-    sessions: "215",
-    status: "active",
-    image: "https://i.pravatar.cc/100?img=32",
-    subjects: ["Science", "Chemistry"],
-  },
-  {
-    name: "Marcus Thompson",
-    email: "m.thompson@tutorium.com",
-    availability: "Mon–Fri, 4–9 PM",
-    rating: "4.7",
-    sessions: "76",
-    status: "active",
-    image: "https://i.pravatar.cc/100?img=60",
-    subjects: ["Mathematics", "Chemistry"],
-  },
-  {
-    name: "Elena Vasquez",
-    email: "e.vasquez@tutorium.com",
-    availability: "Wed–Sun, 1–6 PM",
-    rating: "4.85",
-    sessions: "163",
-    status: "inactive",
-    image: "https://i.pravatar.cc/100?img=5",
-    subjects: ["Science", "Physics"],
-  },
-];
+import { FiEdit2, FiPlus, FiSearch, FiTrash2, FiUsers } from "react-icons/fi";
+
+import { toast } from "sonner";
+
+import AddTutorModal from "./AddTutorModal";
+import EditTutorModal from "./EditTutorModal";
+import DeleteTutorModal from "./DeleteTutorModal";
+
+import EmptyState from "../../ui/EmptyState";
+import ErrorState from "../../ui/ErrorState";
+import LoadingSkeleton from "../../ui/LoadingSkeleton";
+
+import {
+  createTutor,
+  deleteTutor,
+  getTutors,
+  updateTutor,
+} from "../../../../services/tutors.service";
 
 export default function TutorsPage() {
-  const [tutors, setTutors] = useState(initialTutors);
-  const [showModal, setShowModal] = useState(false);
+  const [tutors, setTutors] = useState([]);
+  const [search, setSearch] = useState("");
 
-  function handleAddTutor(tutor) {
-    setTutors((prev) => [tutor, ...prev]);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
+
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const [tutorToEdit, setTutorToEdit] = useState(null);
+
+  const [tutorToDelete, setTutorToDelete] = useState(null);
+
+  const [creatingTutor, setCreatingTutor] = useState(false);
+
+  const [updatingTutor, setUpdatingTutor] = useState(false);
+
+  const [deletingTutor, setDeletingTutor] = useState(false);
+
+  const loadTutors = useCallback(async () => {
+    setLoading(true);
+    setPageError("");
+
+    try {
+      const data = await getTutors();
+      setTutors(data);
+    } catch (error) {
+      console.error("Unable to load tutors:", error);
+
+      const message =
+        error?.message || "Unable to load tutors. Please try again.";
+
+      setPageError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTutors();
+  }, [loadTutors]);
+
+  const filteredTutors = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return tutors;
+    }
+
+    return tutors.filter((tutor) => {
+      const searchableText = [
+        tutor.first_name,
+        tutor.last_name,
+        tutor.full_name,
+        tutor.email,
+        tutor.phone,
+        tutor.timezone,
+        tutor.qualification,
+        tutor.experience,
+        tutor.status,
+        ...(tutor.specialties || []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [search, tutors]);
+
+  const activeTutors = tutors.filter(
+    (tutor) => tutor.status === "active",
+  ).length;
+
+  async function handleAddTutor(formData) {
+    setCreatingTutor(true);
+
+    try {
+      const createdTutor = await createTutor(formData);
+
+      setTutors((current) => [createdTutor, ...current]);
+
+      setShowAddModal(false);
+
+      toast.success("Tutor added successfully.");
+    } catch (error) {
+      console.error("Unable to add tutor:", error);
+
+      if (error?.code === "23505") {
+        toast.error("A tutor with this email already exists.");
+      } else {
+        toast.error(error?.message || "Unable to add tutor.");
+      }
+    } finally {
+      setCreatingTutor(false);
+    }
+  }
+
+  async function handleUpdateTutor(formData) {
+    if (!tutorToEdit) return;
+
+    setUpdatingTutor(true);
+
+    try {
+      const updatedTutor = await updateTutor(tutorToEdit.id, formData);
+
+      setTutors((current) =>
+        current.map((tutor) =>
+          tutor.id === updatedTutor.id ? updatedTutor : tutor,
+        ),
+      );
+
+      setTutorToEdit(null);
+
+      toast.success("Tutor updated successfully.");
+    } catch (error) {
+      console.error("Unable to update tutor:", error);
+
+      if (error?.code === "23505") {
+        toast.error("A tutor with this email already exists.");
+      } else {
+        toast.error(error?.message || "Unable to update tutor.");
+      }
+    } finally {
+      setUpdatingTutor(false);
+    }
+  }
+
+  async function handleDeleteTutor() {
+    if (!tutorToDelete) return;
+
+    setDeletingTutor(true);
+
+    try {
+      await deleteTutor(tutorToDelete.id);
+
+      setTutors((current) =>
+        current.filter((tutor) => tutor.id !== tutorToDelete.id),
+      );
+
+      setTutorToDelete(null);
+
+      toast.success("Tutor deleted successfully.");
+    } catch (error) {
+      console.error("Unable to delete tutor:", error);
+
+      if (error?.code === "23503") {
+        toast.error(
+          "This tutor cannot be deleted because related assignments still exist.",
+        );
+      } else {
+        toast.error(error?.message || "Unable to delete tutor.");
+      }
+    } finally {
+      setDeletingTutor(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <TutorsHeader
+          total={0}
+          active={0}
+          onAdd={() => setShowAddModal(true)}
+        />
+
+        <LoadingSkeleton rows={5} />
+      </div>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <div>
+        <TutorsHeader
+          total={0}
+          active={0}
+          onAdd={() => setShowAddModal(true)}
+        />
+
+        <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <ErrorState
+            title="Unable to load tutors"
+            message={pageError}
+            onRetry={loadTutors}
+          />
+        </section>
+      </div>
+    );
   }
 
   return (
     <div>
-      <div className="mb-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-950 md:text-4xl">
-            Tutors
-          </h1>
-          <p className="mt-2 text-lg text-gray-500">
-            {tutors.length} total ·{" "}
-            {tutors.filter((t) => t.status === "active").length} active
-          </p>
-        </div>
+      <TutorsHeader
+        total={tutors.length}
+        active={activeTutors}
+        onAdd={() => setShowAddModal(true)}
+      />
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#0b2d8a] px-6 py-3 text-lg font-bold text-white transition hover:bg-[#09246f] md:w-auto"
-        >
-          <FaPlus />
-          Add Tutor
-        </button>
-      </div>
-
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-0">
+      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-100 p-5 md:flex-row md:items-center md:justify-between">
-          <div className="flex w-full max-w-[430px] items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3">
-            <FaSearch className="text-gray-400" />
+          <div className="flex w-full max-w-[460px] items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3">
+            <FiSearch className="shrink-0 text-xl text-gray-400" />
+
             <input
-              type="text"
-              placeholder="Search by name or subject..."
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by name, specialty, timezone..."
               className="w-full bg-transparent text-base text-gray-700 outline-none placeholder:text-gray-400"
             />
           </div>
 
           <div className="flex items-center gap-2 text-gray-500">
-            <FaGraduationCap />
-            <span>{tutors.length} results</span>
+            <FiUsers />
+
+            <span>
+              {filteredTutors.length}{" "}
+              {filteredTutors.length === 1 ? "result" : "results"}
+            </span>
           </div>
         </div>
 
-        <TutorTable tutors={tutors} />
+        {filteredTutors.length === 0 ? (
+          search.trim() ? (
+            <EmptyState
+              emoji="🔍"
+              title="No matching tutors"
+              description="No tutors match your search. Try another name, specialty, qualification, or timezone."
+              actionLabel="Clear Search"
+              onAction={() => setSearch("")}
+            />
+          ) : (
+            <EmptyState
+              emoji="👨‍🏫"
+              title="No tutors yet"
+              description="Add your first tutor to begin matching learners with qualified tutors."
+              actionLabel="Add Tutor"
+              onAction={() => setShowAddModal(true)}
+            />
+          )
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1050px]">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left">
+                    <TableHeading>Tutor</TableHeading>
+
+                    <TableHeading>Specialties</TableHeading>
+
+                    <TableHeading>Availability</TableHeading>
+
+                    <TableHeading>Timezone</TableHeading>
+
+                    <TableHeading>Status</TableHeading>
+
+                    <TableHeading>Actions</TableHeading>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredTutors.map((tutor) => (
+                    <TutorDesktopRow
+                      key={tutor.id}
+                      tutor={tutor}
+                      onEdit={() => setTutorToEdit(tutor)}
+                      onDelete={() => setTutorToDelete(tutor)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-4 p-4 md:hidden">
+              {filteredTutors.map((tutor) => (
+                <TutorMobileCard
+                  key={tutor.id}
+                  tutor={tutor}
+                  onEdit={() => setTutorToEdit(tutor)}
+                  onDelete={() => setTutorToDelete(tutor)}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
-      {showModal && (
+      {showAddModal && (
         <AddTutorModal
-          onClose={() => setShowModal(false)}
+          isSubmitting={creatingTutor}
+          onClose={() => {
+            if (!creatingTutor) {
+              setShowAddModal(false);
+            }
+          }}
           onAddTutor={handleAddTutor}
+        />
+      )}
+
+      {tutorToEdit && (
+        <EditTutorModal
+          tutor={tutorToEdit}
+          isSubmitting={updatingTutor}
+          onClose={() => {
+            if (!updatingTutor) {
+              setTutorToEdit(null);
+            }
+          }}
+          onSave={handleUpdateTutor}
+        />
+      )}
+
+      {tutorToDelete && (
+        <DeleteTutorModal
+          tutor={tutorToDelete}
+          isDeleting={deletingTutor}
+          onClose={() => {
+            if (!deletingTutor) {
+              setTutorToDelete(null);
+            }
+          }}
+          onDelete={handleDeleteTutor}
         />
       )}
     </div>
   );
+}
+
+function TutorsHeader({ total, active, onAdd }) {
+  return (
+    <div className="mb-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-950 md:text-4xl">Tutors</h1>
+
+        <p className="mt-2 text-lg text-gray-500">
+          {total} total · {active} active
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={onAdd}
+        className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#0b2d8a] px-6 py-3 text-lg font-bold text-white transition hover:bg-[#09246f] md:w-auto"
+      >
+        <FiPlus className="text-xl" />
+        Add Tutor
+      </button>
+    </div>
+  );
+}
+
+function TableHeading({ children }) {
+  return (
+    <th className="px-8 py-5 text-xs font-bold uppercase tracking-[0.12em] text-gray-500">
+      {children}
+    </th>
+  );
+}
+
+function TutorDesktopRow({ tutor, onEdit, onDelete }) {
+  return (
+    <tr className="border-b border-gray-100 last:border-b-0">
+      <td className="px-8 py-6">
+        <TutorIdentity tutor={tutor} />
+      </td>
+
+      <td className="px-8 py-6">
+        <SpecialtyList specialties={tutor.specialties} />
+      </td>
+
+      <td className="px-8 py-6 text-sm text-gray-600">
+        <p>{formatDays(tutor.available_days)}</p>
+
+        <p className="mt-1 text-gray-400">
+          {formatTimeRange(
+            tutor.available_start_time,
+            tutor.available_end_time,
+          )}
+        </p>
+      </td>
+
+      <td className="px-8 py-6 text-gray-600">{tutor.timezone || "—"}</td>
+
+      <td className="px-8 py-6">
+        <StatusBadge status={tutor.status} />
+      </td>
+
+      <td className="px-8 py-6">
+        <TutorActions
+          tutorName={tutor.full_name}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      </td>
+    </tr>
+  );
+}
+
+function TutorMobileCard({ tutor, onEdit, onDelete }) {
+  return (
+    <article className="rounded-2xl border border-gray-100 bg-white p-5">
+      <div className="flex items-start justify-between gap-3">
+        <TutorIdentity tutor={tutor} />
+
+        <StatusBadge status={tutor.status} />
+      </div>
+
+      <div className="mt-4">
+        <SpecialtyList specialties={tutor.specialties} />
+      </div>
+
+      <div className="mt-4 grid gap-4 border-t border-gray-100 pt-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Availability
+          </p>
+
+          <p className="mt-1 text-sm text-gray-600">
+            {formatDays(tutor.available_days)}
+          </p>
+
+          <p className="mt-1 text-xs text-gray-400">
+            {formatTimeRange(
+              tutor.available_start_time,
+              tutor.available_end_time,
+            )}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Timezone
+          </p>
+
+          <p className="mt-1 text-sm text-gray-600">{tutor.timezone || "—"}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex justify-end border-t border-gray-100 pt-4">
+        <TutorActions
+          tutorName={tutor.full_name}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      </div>
+    </article>
+  );
+}
+
+function TutorActions({ tutorName, onEdit, onDelete }) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`Edit ${tutorName}`}
+        title="Edit tutor"
+        className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#0b2d8a] hover:bg-[#0b2d8a]/10 hover:text-[#0b2d8a]"
+      >
+        <FiEdit2 />
+      </button>
+
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`Delete ${tutorName}`}
+        title="Delete tutor"
+        className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-red-500 transition hover:border-red-400 hover:bg-red-50 hover:text-red-600"
+      >
+        <FiTrash2 />
+      </button>
+    </div>
+  );
+}
+
+function TutorIdentity({ tutor }) {
+  const initials = getInitials(tutor.full_name);
+
+  return (
+    <div className="flex min-w-0 items-center gap-4">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0b2d8a]/10 text-sm font-bold text-[#0b2d8a]">
+        {initials || "TU"}
+      </div>
+
+      <div className="min-w-0">
+        <p className="truncate text-base font-bold text-gray-900">
+          {tutor.full_name}
+        </p>
+
+        <p className="truncate text-sm text-gray-400">{tutor.email}</p>
+      </div>
+    </div>
+  );
+}
+
+function SpecialtyList({ specialties = [] }) {
+  if (!specialties.length) {
+    return <span className="text-sm text-gray-400">No specialties</span>;
+  }
+
+  return (
+    <div className="flex max-w-[300px] flex-wrap gap-2">
+      {specialties.map((specialty, index) => (
+        <span
+          key={`${specialty}-${index}`}
+          className="rounded-full bg-[#0b2d8a]/10 px-3 py-1 text-xs font-semibold text-[#0b2d8a]"
+        >
+          {specialty}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function StatusBadge({ status = "pending" }) {
+  const styles = {
+    pending: "bg-amber-50 text-amber-700",
+    active: "bg-green-50 text-green-700",
+    inactive: "bg-gray-100 text-gray-500",
+  };
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-4 py-1 text-xs font-semibold capitalize ${
+        styles[status] || styles.pending
+      }`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function formatDays(days = []) {
+  return days.length ? days.join(", ") : "No availability";
+}
+
+function formatTimeRange(startTime, endTime) {
+  if (!startTime || !endTime) {
+    return "No time provided";
+  }
+
+  return `${startTime} – ${endTime}`;
+}
+
+function getInitials(name = "") {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
