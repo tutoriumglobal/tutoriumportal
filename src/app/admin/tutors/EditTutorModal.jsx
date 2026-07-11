@@ -30,27 +30,31 @@ const fallbackTimezones = [
   "Pacific/Auckland",
 ];
 
-export default function AddTutorModal({
+export default function EditTutorModal({
+  tutor,
   specialties = [],
   onClose,
-  onAddTutor,
+  onSave,
   isSubmitting = false,
 }) {
   const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    timezone: "",
-    available_days: [],
-    available_start_time: "",
-    available_end_time: "",
-    qualification: "",
-    experience: "",
-    bio: "",
+    first_name: tutor.first_name || "",
+    last_name: tutor.last_name || "",
+    email: tutor.email || "",
+    phone: tutor.phone || "",
+    timezone: tutor.timezone || "",
+    available_days: tutor.available_days || [],
+    available_start_time: tutor.available_start_time || "",
+    available_end_time: tutor.available_end_time || "",
+    qualification: tutor.qualification || "",
+    experience: tutor.experience || "",
+    bio: tutor.bio || "",
+    status: tutor.status || "pending",
   });
 
-  const [selectedSpecialtyIds, setSelectedSpecialtyIds] = useState([]);
+  const [selectedSpecialtyIds, setSelectedSpecialtyIds] = useState(
+    tutor.specialties?.map((specialty) => specialty.id) || [],
+  );
 
   const timezoneOptions = useMemo(() => {
     try {
@@ -111,7 +115,8 @@ export default function AddTutorModal({
 
     if (!canSubmit) return;
 
-    await onAddTutor({
+    await onSave({
+      ...tutor,
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       email: formData.email.trim().toLowerCase(),
@@ -123,31 +128,22 @@ export default function AddTutorModal({
       qualification: formData.qualification.trim(),
       experience: formData.experience.trim() || null,
       bio: formData.bio.trim() || null,
+      status: formData.status,
       specialty_ids: selectedSpecialtyIds,
-      avatar_url: null,
-      status: "pending",
     });
   }
 
   return (
-    <div
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isSubmitting) {
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="max-h-[92vh] w-full max-w-[650px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
-              Add New Tutor
+              Edit Tutor
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
-              Add tutor details, specialties, and teaching availability.
+              Update tutor details, specialties, availability, and status.
             </p>
           </div>
 
@@ -155,7 +151,7 @@ export default function AddTutorModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500"
           >
             <FiX />
           </button>
@@ -193,7 +189,7 @@ export default function AddTutorModal({
             <Input
               name="phone"
               type="tel"
-              label="Phone (Optional)"
+              label="Phone"
               value={formData.phone}
               onChange={handleChange}
               disabled={isSubmitting}
@@ -230,11 +226,10 @@ export default function AddTutorModal({
                     key={day}
                     type="button"
                     onClick={() => toggleAvailabilityDay(day)}
-                    disabled={isSubmitting}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                       selected
                         ? "border-[#0b2d8a] bg-[#0b2d8a] text-white"
-                        : "border-gray-200 text-gray-600 hover:border-[#0b2d8a]"
+                        : "border-gray-200 text-gray-600"
                     }`}
                   >
                     {day}
@@ -251,7 +246,6 @@ export default function AddTutorModal({
               label="Available Start Time *"
               value={formData.available_start_time}
               onChange={handleChange}
-              disabled={isSubmitting}
             />
 
             <Input
@@ -260,51 +254,31 @@ export default function AddTutorModal({
               label="Available End Time *"
               value={formData.available_end_time}
               onChange={handleChange}
-              disabled={isSubmitting}
             />
           </div>
-
-          {formData.available_start_time &&
-            formData.available_end_time &&
-            !validTimeRange && (
-              <p className="text-sm font-medium text-red-500">
-                End time must be later than the start time.
-              </p>
-            )}
 
           <Input
             name="qualification"
             label="Qualification *"
-            placeholder="e.g. B.Sc. Mathematics"
             value={formData.qualification}
             onChange={handleChange}
-            disabled={isSubmitting}
           />
 
           <Input
             name="experience"
             label="Teaching Experience"
-            placeholder="e.g. 5 years"
             value={formData.experience}
             onChange={handleChange}
-            disabled={isSubmitting}
           />
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Short Bio
-            </label>
-
-            <textarea
-              name="bio"
-              rows={3}
-              value={formData.bio}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              placeholder="Briefly describe the tutor's teaching background."
-              className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20"
-            />
-          </div>
+          <textarea
+            name="bio"
+            rows={3}
+            value={formData.bio}
+            onChange={handleChange}
+            placeholder="Short tutor biography"
+            className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#0b2d8a]"
+          />
 
           <div>
             <label className="mb-3 block text-sm font-semibold text-gray-700">
@@ -320,11 +294,10 @@ export default function AddTutorModal({
                     key={specialty.id}
                     type="button"
                     onClick={() => toggleSpecialty(specialty.id)}
-                    disabled={isSubmitting}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                       selected
                         ? "border-[#0b2d8a] bg-[#0b2d8a] text-white"
-                        : "border-gray-200 text-gray-600 hover:border-[#0b2d8a]"
+                        : "border-gray-200 text-gray-600"
                     }`}
                   >
                     {specialty.name}
@@ -334,12 +307,22 @@ export default function AddTutorModal({
             </div>
           </div>
 
-          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+          <SelectField
+            name="status"
+            label="Tutor Status"
+            value={formData.status}
+            onChange={handleChange}
+          >
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </SelectField>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-xl border border-gray-200 px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
+              className="rounded-xl border border-gray-200 px-6 py-3 font-semibold text-gray-700"
             >
               Cancel
             </button>
@@ -347,19 +330,19 @@ export default function AddTutorModal({
             <button
               type="submit"
               disabled={!canSubmit}
-              className={`flex min-w-[145px] items-center justify-center gap-2 rounded-xl px-6 py-3 font-bold text-white ${
+              className={`flex min-w-[150px] items-center justify-center gap-2 rounded-xl px-6 py-3 font-bold text-white ${
                 canSubmit
-                  ? "bg-[#0b2d8a] hover:bg-[#09246f]"
+                  ? "bg-[#0b2d8a]"
                   : "cursor-not-allowed bg-[#0b2d8a]/50"
               }`}
             >
               {isSubmitting ? (
                 <>
                   <FiLoader className="animate-spin" />
-                  Adding...
+                  Saving...
                 </>
               ) : (
-                "Add Tutor"
+                "Save Changes"
               )}
             </button>
           </div>
@@ -373,18 +356,18 @@ function Input({ name, label, type = "text", ...props }) {
   return (
     <div>
       <label
-        htmlFor={name}
+        htmlFor={`edit-${name}`}
         className="mb-2 block text-sm font-semibold text-gray-700"
       >
         {label}
       </label>
 
       <input
-        id={name}
+        id={`edit-${name}`}
         name={name}
         type={type}
         {...props}
-        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20"
+        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#0b2d8a]"
       />
     </div>
   );
@@ -394,17 +377,17 @@ function SelectField({ name, label, children, ...props }) {
   return (
     <div>
       <label
-        htmlFor={name}
+        htmlFor={`edit-${name}`}
         className="mb-2 block text-sm font-semibold text-gray-700"
       >
         {label}
       </label>
 
       <select
-        id={name}
+        id={`edit-${name}`}
         name={name}
         {...props}
-        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20"
+        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b2d8a]"
       >
         {children}
       </select>
