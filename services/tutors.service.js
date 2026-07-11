@@ -1,64 +1,158 @@
-export async function getTutors(supabase) {
+import { supabase } from "./supabase";
+
+function normalizeTutor(tutor) {
+  if (!tutor) return null;
+
+  return {
+    ...tutor,
+
+    full_name: `${tutor.first_name || ""} ${tutor.last_name || ""}`.trim(),
+
+    specialties: Array.isArray(tutor.specialties) ? tutor.specialties : [],
+
+    available_days: Array.isArray(tutor.available_days)
+      ? tutor.available_days
+      : [],
+  };
+}
+
+/**
+ * Get all tutors.
+ */
+export async function getTutors() {
   const { data, error } = await supabase
     .from("tutors")
-    .select(
-      `
-      *,
-      tutor_subjects (
-        subject_id,
-        subjects (
-          id,
-          name,
-          category
-        )
-      )
-    `,
-    )
+    .select("*")
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error(error.message);
+    throw error;
   }
 
-  return data;
+  return (data || []).map(normalizeTutor);
 }
 
-export async function createTutor(supabase, tutorData, subjectIds = []) {
-  const { data: tutor, error: tutorError } = await supabase
+/**
+ * Get a single tutor.
+ */
+export async function getTutorById(tutorId) {
+  if (!tutorId) {
+    throw new Error("Tutor ID is required.");
+  }
+
+  const { data, error } = await supabase
     .from("tutors")
-    .insert({
-      full_name: tutorData.full_name,
-      email: tutorData.email,
-      phone: tutorData.phone || null,
-      availability: tutorData.availability || null,
-      qualification: tutorData.qualification || null,
-      experience: tutorData.experience || null,
-      bio: tutorData.bio || null,
-      avatar_url: tutorData.avatar_url || null,
-      status: tutorData.status || "active",
-    })
+    .select("*")
+    .eq("id", tutorId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeTutor(data);
+}
+
+/**
+ * Create a tutor.
+ */
+export async function createTutor(tutorData) {
+  const payload = {
+    first_name: tutorData.first_name.trim(),
+    last_name: tutorData.last_name.trim(),
+    email: tutorData.email.trim().toLowerCase(),
+    phone: tutorData.phone?.trim() || null,
+
+    timezone: tutorData.timezone,
+
+    available_days: tutorData.available_days || [],
+    available_start_time: tutorData.available_start_time,
+    available_end_time: tutorData.available_end_time,
+
+    qualification: tutorData.qualification.trim(),
+    experience: tutorData.experience?.trim() || null,
+    bio: tutorData.bio?.trim() || null,
+
+    specialties: tutorData.specialties || [],
+
+    avatar_url: tutorData.avatar_url || null,
+
+    // New tutors must be manually approved.
+    status: "pending",
+  };
+
+  const { data, error } = await supabase
+    .from("tutors")
+    .insert(payload)
     .select()
     .single();
 
-  if (tutorError) {
-    throw new Error(tutorError.message);
+  if (error) {
+    throw error;
   }
 
-  if (subjectIds.length > 0) {
-    const subjectRows = subjectIds.map((subjectId) => ({
-      tutor_id: tutor.id,
-      subject_id: subjectId,
-    }));
+  return normalizeTutor(data);
+}
 
-    const { error: subjectsError } = await supabase
-      .from("tutor_subjects")
-      .insert(subjectRows);
-
-    if (subjectsError) {
-      await supabase.from("tutors").delete().eq("id", tutor.id);
-      throw new Error(subjectsError.message);
-    }
+/**
+ * Update a tutor.
+ */
+export async function updateTutor(tutorId, tutorData) {
+  if (!tutorId) {
+    throw new Error("Tutor ID is required.");
   }
 
-  return tutor;
+  const payload = {
+    first_name: tutorData.first_name.trim(),
+    last_name: tutorData.last_name.trim(),
+    email: tutorData.email.trim().toLowerCase(),
+    phone: tutorData.phone?.trim() || null,
+
+    timezone: tutorData.timezone,
+
+    available_days: tutorData.available_days || [],
+    available_start_time: tutorData.available_start_time,
+    available_end_time: tutorData.available_end_time,
+
+    qualification: tutorData.qualification.trim(),
+    experience: tutorData.experience?.trim() || null,
+    bio: tutorData.bio?.trim() || null,
+
+    specialties: tutorData.specialties || [],
+
+    avatar_url: tutorData.avatar_url || null,
+    status: tutorData.status || "pending",
+
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("tutors")
+    .update(payload)
+    .eq("id", tutorId)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeTutor(data);
+}
+
+/**
+ * Delete a tutor.
+ */
+export async function deleteTutor(tutorId) {
+  if (!tutorId) {
+    throw new Error("Tutor ID is required.");
+  }
+
+  const { error } = await supabase.from("tutors").delete().eq("id", tutorId);
+
+  if (error) {
+    throw error;
+  }
+
+  return true;
 }

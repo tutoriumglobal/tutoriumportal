@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { FiEdit2, FiPlus, FiSearch, FiTrash2, FiUsers } from "react-icons/fi";
+
 import { toast } from "sonner";
 
 import AddTutorModal from "./AddTutorModal";
@@ -9,18 +11,58 @@ import EditTutorModal from "./EditTutorModal";
 import DeleteTutorModal from "./DeleteTutorModal";
 
 import EmptyState from "../../ui/EmptyState";
+import ErrorState from "../../ui/ErrorState";
+import LoadingSkeleton from "../../ui/LoadingSkeleton";
+
+import {
+  createTutor,
+  deleteTutor,
+  getTutors,
+  updateTutor,
+} from "../../../../services/tutors.service";
 
 export default function TutorsPage() {
   const [tutors, setTutors] = useState([]);
   const [search, setSearch] = useState("");
 
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
+
   const [showAddModal, setShowAddModal] = useState(false);
+
   const [tutorToEdit, setTutorToEdit] = useState(null);
+
   const [tutorToDelete, setTutorToDelete] = useState(null);
 
   const [creatingTutor, setCreatingTutor] = useState(false);
+
   const [updatingTutor, setUpdatingTutor] = useState(false);
+
   const [deletingTutor, setDeletingTutor] = useState(false);
+
+  const loadTutors = useCallback(async () => {
+    setLoading(true);
+    setPageError("");
+
+    try {
+      const data = await getTutors();
+      setTutors(data);
+    } catch (error) {
+      console.error("Unable to load tutors:", error);
+
+      const message =
+        error?.message || "Unable to load tutors. Please try again.";
+
+      setPageError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTutors();
+  }, [loadTutors]);
 
   const filteredTutors = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -40,7 +82,7 @@ export default function TutorsPage() {
         tutor.qualification,
         tutor.experience,
         tutor.status,
-        ...(tutor.specialties || []).map((specialty) => specialty.name),
+        ...(tutor.specialties || []),
       ]
         .filter(Boolean)
         .join(" ")
@@ -58,32 +100,21 @@ export default function TutorsPage() {
     setCreatingTutor(true);
 
     try {
-      const newTutor = {
-        id: Date.now(),
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        full_name: `${formData.first_name} ${formData.last_name}`,
-        email: formData.email,
-        phone: formData.phone,
-        timezone: formData.timezone,
-        available_days: formData.available_days,
-        available_start_time: formData.available_start_time,
-        available_end_time: formData.available_end_time,
-        qualification: formData.qualification,
-        experience: formData.experience,
-        bio: formData.bio,
-        status: formData.status || "pending",
-        avatar_url: null,
-        specialties: formData.specialties || [],
-      };
+      const createdTutor = await createTutor(formData);
 
-      setTutors((current) => [newTutor, ...current]);
+      setTutors((current) => [createdTutor, ...current]);
+
       setShowAddModal(false);
 
       toast.success("Tutor added successfully.");
     } catch (error) {
       console.error("Unable to add tutor:", error);
-      toast.error(error?.message || "Unable to add tutor.");
+
+      if (error?.code === "23505") {
+        toast.error("A tutor with this email already exists.");
+      } else {
+        toast.error(error?.message || "Unable to add tutor.");
+      }
     } finally {
       setCreatingTutor(false);
     }
@@ -95,12 +126,7 @@ export default function TutorsPage() {
     setUpdatingTutor(true);
 
     try {
-      const updatedTutor = {
-        ...tutorToEdit,
-        ...formData,
-        full_name: `${formData.first_name} ${formData.last_name}`,
-        specialties: formData.specialties || [],
-      };
+      const updatedTutor = await updateTutor(tutorToEdit.id, formData);
 
       setTutors((current) =>
         current.map((tutor) =>
@@ -109,10 +135,16 @@ export default function TutorsPage() {
       );
 
       setTutorToEdit(null);
+
       toast.success("Tutor updated successfully.");
     } catch (error) {
       console.error("Unable to update tutor:", error);
-      toast.error(error?.message || "Unable to update tutor.");
+
+      if (error?.code === "23505") {
+        toast.error("A tutor with this email already exists.");
+      } else {
+        toast.error(error?.message || "Unable to update tutor.");
+      }
     } finally {
       setUpdatingTutor(false);
     }
@@ -124,18 +156,62 @@ export default function TutorsPage() {
     setDeletingTutor(true);
 
     try {
+      await deleteTutor(tutorToDelete.id);
+
       setTutors((current) =>
         current.filter((tutor) => tutor.id !== tutorToDelete.id),
       );
 
       setTutorToDelete(null);
+
       toast.success("Tutor deleted successfully.");
     } catch (error) {
       console.error("Unable to delete tutor:", error);
-      toast.error(error?.message || "Unable to delete tutor.");
+
+      if (error?.code === "23503") {
+        toast.error(
+          "This tutor cannot be deleted because related assignments still exist.",
+        );
+      } else {
+        toast.error(error?.message || "Unable to delete tutor.");
+      }
     } finally {
       setDeletingTutor(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <TutorsHeader
+          total={0}
+          active={0}
+          onAdd={() => setShowAddModal(true)}
+        />
+
+        <LoadingSkeleton rows={5} />
+      </div>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <div>
+        <TutorsHeader
+          total={0}
+          active={0}
+          onAdd={() => setShowAddModal(true)}
+        />
+
+        <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <ErrorState
+            title="Unable to load tutors"
+            message={pageError}
+            onRetry={loadTutors}
+          />
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -175,7 +251,7 @@ export default function TutorsPage() {
             <EmptyState
               emoji="🔍"
               title="No matching tutors"
-              description="No tutors match your search. Try another name, specialty, or timezone."
+              description="No tutors match your search. Try another name, specialty, qualification, or timezone."
               actionLabel="Clear Search"
               onAction={() => setSearch("")}
             />
@@ -195,10 +271,15 @@ export default function TutorsPage() {
                 <thead>
                   <tr className="border-b border-gray-100 text-left">
                     <TableHeading>Tutor</TableHeading>
+
                     <TableHeading>Specialties</TableHeading>
+
                     <TableHeading>Availability</TableHeading>
+
                     <TableHeading>Timezone</TableHeading>
+
                     <TableHeading>Status</TableHeading>
+
                     <TableHeading>Actions</TableHeading>
                   </tr>
                 </thead>
@@ -346,6 +427,7 @@ function TutorMobileCard({ tutor, onEdit, onDelete }) {
     <article className="rounded-2xl border border-gray-100 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <TutorIdentity tutor={tutor} />
+
         <StatusBadge status={tutor.status} />
       </div>
 
@@ -418,10 +500,12 @@ function TutorActions({ tutorName, onEdit, onDelete }) {
 }
 
 function TutorIdentity({ tutor }) {
+  const initials = getInitials(tutor.full_name);
+
   return (
     <div className="flex min-w-0 items-center gap-4">
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0b2d8a]/10 text-sm font-bold text-[#0b2d8a]">
-        {getInitials(tutor.full_name) || "TU"}
+        {initials || "TU"}
       </div>
 
       <div className="min-w-0">
@@ -442,30 +526,14 @@ function SpecialtyList({ specialties = [] }) {
 
   return (
     <div className="flex max-w-[300px] flex-wrap gap-2">
-      {specialties.map((specialty, index) => {
-        const name =
-          typeof specialty === "string" ? specialty : specialty?.name || "";
-
-        const color =
-          typeof specialty === "string"
-            ? "#0B2D8A"
-            : specialty?.color || "#0B2D8A";
-
-        if (!name) return null;
-
-        return (
-          <span
-            key={`${name}-${index}`}
-            className="rounded-full px-3 py-1 text-xs font-semibold"
-            style={{
-              color,
-              backgroundColor: hexToRgba(color, 0.1),
-            }}
-          >
-            {name}
-          </span>
-        );
-      })}
+      {specialties.map((specialty, index) => (
+        <span
+          key={`${specialty}-${index}`}
+          className="rounded-full bg-[#0b2d8a]/10 px-3 py-1 text-xs font-semibold text-[#0b2d8a]"
+        >
+          {specialty}
+        </span>
+      ))}
     </div>
   );
 }
@@ -507,17 +575,4 @@ function getInitials(name = "") {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
-}
-
-function hexToRgba(hex, opacity) {
-  const safeHex =
-    typeof hex === "string" && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : "#0B2D8A";
-
-  const normalized = safeHex.replace("#", "");
-
-  const red = parseInt(normalized.slice(0, 2), 16);
-  const green = parseInt(normalized.slice(2, 4), 16);
-  const blue = parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
