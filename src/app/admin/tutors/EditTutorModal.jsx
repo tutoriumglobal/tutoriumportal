@@ -32,7 +32,6 @@ const fallbackTimezones = [
 
 export default function EditTutorModal({
   tutor,
-  specialties = [],
   onClose,
   onSave,
   isSubmitting = false,
@@ -43,7 +42,9 @@ export default function EditTutorModal({
     email: tutor.email || "",
     phone: tutor.phone || "",
     timezone: tutor.timezone || "",
-    available_days: tutor.available_days || [],
+    available_days: Array.isArray(tutor.available_days)
+      ? tutor.available_days
+      : [],
     available_start_time: tutor.available_start_time || "",
     available_end_time: tutor.available_end_time || "",
     qualification: tutor.qualification || "",
@@ -52,8 +53,16 @@ export default function EditTutorModal({
     status: tutor.status || "pending",
   });
 
-  const [selectedSpecialtyIds, setSelectedSpecialtyIds] = useState(
-    tutor.specialties?.map((specialty) => specialty.id) || [],
+  const [specialtyInput, setSpecialtyInput] = useState("");
+
+  const [specialties, setSpecialties] = useState(() =>
+    Array.isArray(tutor.specialties)
+      ? tutor.specialties
+          .map((specialty) =>
+            typeof specialty === "string" ? specialty : specialty?.name || "",
+          )
+          .filter(Boolean)
+      : [],
   );
 
   const timezoneOptions = useMemo(() => {
@@ -86,28 +95,51 @@ export default function EditTutorModal({
     }));
   }
 
-  function toggleSpecialty(specialtyId) {
-    setSelectedSpecialtyIds((current) =>
-      current.includes(specialtyId)
-        ? current.filter((id) => id !== specialtyId)
-        : [...current, specialtyId],
+  function addSpecialty() {
+    const value = specialtyInput.trim();
+
+    if (!value) return;
+
+    const exists = specialties.some(
+      (specialty) => specialty.toLowerCase() === value.toLowerCase(),
+    );
+
+    if (exists) {
+      setSpecialtyInput("");
+      return;
+    }
+
+    setSpecialties((current) => [...current, value]);
+    setSpecialtyInput("");
+  }
+
+  function removeSpecialty(specialtyToRemove) {
+    setSpecialties((current) =>
+      current.filter((specialty) => specialty !== specialtyToRemove),
     );
   }
 
+  function handleSpecialtyKeyDown(event) {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      addSpecialty();
+    }
+  }
+
   const validTimeRange =
-    formData.available_start_time &&
-    formData.available_end_time &&
+    Boolean(formData.available_start_time) &&
+    Boolean(formData.available_end_time) &&
     formData.available_start_time < formData.available_end_time;
 
   const canSubmit =
-    formData.first_name.trim() &&
-    formData.last_name.trim() &&
-    formData.email.trim() &&
-    formData.timezone &&
+    Boolean(formData.first_name.trim()) &&
+    Boolean(formData.last_name.trim()) &&
+    Boolean(formData.email.trim()) &&
+    Boolean(formData.timezone) &&
     formData.available_days.length > 0 &&
     validTimeRange &&
-    formData.qualification.trim() &&
-    selectedSpecialtyIds.length > 0 &&
+    Boolean(formData.qualification.trim()) &&
+    specialties.length > 0 &&
     !isSubmitting;
 
   async function handleSubmit(event) {
@@ -119,6 +151,7 @@ export default function EditTutorModal({
       ...tutor,
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
+      full_name: `${formData.first_name.trim()} ${formData.last_name.trim()}`,
       email: formData.email.trim().toLowerCase(),
       phone: formData.phone.trim() || null,
       timezone: formData.timezone,
@@ -129,16 +162,32 @@ export default function EditTutorModal({
       experience: formData.experience.trim() || null,
       bio: formData.bio.trim() || null,
       status: formData.status,
-      specialty_ids: selectedSpecialtyIds,
+      specialties,
     });
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[92vh] w-full max-w-[650px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <div
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSubmitting) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-tutor-title"
+        className="max-h-[92vh] w-full max-w-[650px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
+      >
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
+            <h2
+              id="edit-tutor-title"
+              className="text-xl font-bold text-gray-900 sm:text-2xl"
+            >
               Edit Tutor
             </h2>
 
@@ -151,7 +200,8 @@ export default function EditTutorModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500"
+            aria-label="Close modal"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FiX />
           </button>
@@ -165,6 +215,7 @@ export default function EditTutorModal({
               value={formData.first_name}
               onChange={handleChange}
               disabled={isSubmitting}
+              required
             />
 
             <Input
@@ -173,6 +224,7 @@ export default function EditTutorModal({
               value={formData.last_name}
               onChange={handleChange}
               disabled={isSubmitting}
+              required
             />
           </div>
 
@@ -184,6 +236,7 @@ export default function EditTutorModal({
               value={formData.email}
               onChange={handleChange}
               disabled={isSubmitting}
+              required
             />
 
             <Input
@@ -202,6 +255,7 @@ export default function EditTutorModal({
             value={formData.timezone}
             onChange={handleChange}
             disabled={isSubmitting}
+            required
           >
             <option value="">Select timezone</option>
 
@@ -225,12 +279,13 @@ export default function EditTutorModal({
                   <button
                     key={day}
                     type="button"
+                    disabled={isSubmitting}
                     onClick={() => toggleAvailabilityDay(day)}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
                       selected
                         ? "border-[#0b2d8a] bg-[#0b2d8a] text-white"
-                        : "border-gray-200 text-gray-600"
-                    }`}
+                        : "border-gray-200 bg-white text-gray-600 hover:border-[#0b2d8a] hover:text-[#0b2d8a]"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     {day}
                   </button>
@@ -246,6 +301,8 @@ export default function EditTutorModal({
               label="Available Start Time *"
               value={formData.available_start_time}
               onChange={handleChange}
+              disabled={isSubmitting}
+              required
             />
 
             <Input
@@ -254,57 +311,113 @@ export default function EditTutorModal({
               label="Available End Time *"
               value={formData.available_end_time}
               onChange={handleChange}
+              disabled={isSubmitting}
+              required
             />
           </div>
+
+          {formData.available_start_time &&
+            formData.available_end_time &&
+            !validTimeRange && (
+              <p className="text-sm font-medium text-red-500">
+                Available end time must be later than the start time.
+              </p>
+            )}
 
           <Input
             name="qualification"
             label="Qualification *"
             value={formData.qualification}
             onChange={handleChange}
+            disabled={isSubmitting}
+            required
           />
 
           <Input
             name="experience"
             label="Teaching Experience"
+            placeholder="e.g. 5 years"
             value={formData.experience}
             onChange={handleChange}
-          />
-
-          <textarea
-            name="bio"
-            rows={3}
-            value={formData.bio}
-            onChange={handleChange}
-            placeholder="Short tutor biography"
-            className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#0b2d8a]"
+            disabled={isSubmitting}
           />
 
           <div>
-            <label className="mb-3 block text-sm font-semibold text-gray-700">
+            <label
+              htmlFor="edit-bio"
+              className="mb-2 block text-sm font-semibold text-gray-700"
+            >
+              Short Bio
+            </label>
+
+            <textarea
+              id="edit-bio"
+              name="bio"
+              rows={3}
+              value={formData.bio}
+              onChange={handleChange}
+              disabled={isSubmitting}
+              placeholder="Short tutor biography"
+              className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20 disabled:bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="edit-specialty-input"
+              className="mb-2 block text-sm font-semibold text-gray-700"
+            >
               Specialties *
             </label>
 
-            <div className="flex flex-wrap gap-2">
-              {specialties.map((specialty) => {
-                const selected = selectedSpecialtyIds.includes(specialty.id);
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="edit-specialty-input"
+                type="text"
+                value={specialtyInput}
+                onChange={(event) => setSpecialtyInput(event.target.value)}
+                onKeyDown={handleSpecialtyKeyDown}
+                disabled={isSubmitting}
+                placeholder="e.g. Mathematics"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20 disabled:bg-gray-50"
+              />
 
-                return (
-                  <button
-                    key={specialty.id}
-                    type="button"
-                    onClick={() => toggleSpecialty(specialty.id)}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                      selected
-                        ? "border-[#0b2d8a] bg-[#0b2d8a] text-white"
-                        : "border-gray-200 text-gray-600"
-                    }`}
-                  >
-                    {specialty.name}
-                  </button>
-                );
-              })}
+              <button
+                type="button"
+                onClick={addSpecialty}
+                disabled={!specialtyInput.trim() || isSubmitting}
+                className="rounded-xl bg-[#0b2d8a] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#09246f] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Add
+              </button>
             </div>
+
+            <p className="mt-2 text-xs text-gray-500">
+              Press Enter or comma to add a specialty.
+            </p>
+
+            {specialties.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {specialties.map((specialty) => (
+                  <span
+                    key={specialty}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0b2d8a]/10 px-3 py-1.5 text-sm font-semibold text-[#0b2d8a]"
+                  >
+                    {specialty}
+
+                    <button
+                      type="button"
+                      onClick={() => removeSpecialty(specialty)}
+                      disabled={isSubmitting}
+                      aria-label={`Remove ${specialty}`}
+                      className="text-[#0b2d8a]/60 transition hover:text-red-500 disabled:opacity-50"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <SelectField
@@ -312,17 +425,19 @@ export default function EditTutorModal({
             label="Tutor Status"
             value={formData.status}
             onChange={handleChange}
+            disabled={isSubmitting}
           >
             <option value="pending">Pending</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </SelectField>
 
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-gray-200 px-6 py-3 font-semibold text-gray-700"
+              disabled={isSubmitting}
+              className="w-full rounded-xl border border-gray-200 px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               Cancel
             </button>
@@ -330,9 +445,9 @@ export default function EditTutorModal({
             <button
               type="submit"
               disabled={!canSubmit}
-              className={`flex min-w-[150px] items-center justify-center gap-2 rounded-xl px-6 py-3 font-bold text-white ${
+              className={`flex w-full min-w-[150px] items-center justify-center gap-2 rounded-xl px-6 py-3 font-bold text-white transition sm:w-auto ${
                 canSubmit
-                  ? "bg-[#0b2d8a]"
+                  ? "bg-[#0b2d8a] hover:bg-[#09246f]"
                   : "cursor-not-allowed bg-[#0b2d8a]/50"
               }`}
             >
@@ -352,7 +467,7 @@ export default function EditTutorModal({
   );
 }
 
-function Input({ name, label, type = "text", ...props }) {
+function Input({ name, label, type = "text", required = false, ...props }) {
   return (
     <div>
       <label
@@ -366,14 +481,15 @@ function Input({ name, label, type = "text", ...props }) {
         id={`edit-${name}`}
         name={name}
         type={type}
+        required={required}
         {...props}
-        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#0b2d8a]"
+        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20 disabled:bg-gray-50"
       />
     </div>
   );
 }
 
-function SelectField({ name, label, children, ...props }) {
+function SelectField({ name, label, required = false, children, ...props }) {
   return (
     <div>
       <label
@@ -386,8 +502,9 @@ function SelectField({ name, label, children, ...props }) {
       <select
         id={`edit-${name}`}
         name={name}
+        required={required}
         {...props}
-        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b2d8a]"
+        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20 disabled:bg-gray-50"
       >
         {children}
       </select>

@@ -10,15 +10,6 @@ import DeleteTutorModal from "./DeleteTutorModal";
 
 import EmptyState from "../../ui/EmptyState";
 
-const availableSpecialties = [
-  { id: 1, name: "Mathematics", color: "#0B2D8A" },
-  { id: 2, name: "English", color: "#7C3AED" },
-  { id: 3, name: "Science", color: "#059669" },
-  { id: 4, name: "Physics", color: "#E52525" },
-  { id: 5, name: "Chemistry", color: "#0891B2" },
-  { id: 6, name: "French", color: "#BE185D" },
-];
-
 export default function TutorsPage() {
   const [tutors, setTutors] = useState([]);
   const [search, setSearch] = useState("");
@@ -67,10 +58,6 @@ export default function TutorsPage() {
     setCreatingTutor(true);
 
     try {
-      const selectedSpecialties = availableSpecialties.filter((specialty) =>
-        formData.specialty_ids.includes(specialty.id),
-      );
-
       const newTutor = {
         id: Date.now(),
         first_name: formData.first_name,
@@ -87,7 +74,7 @@ export default function TutorsPage() {
         bio: formData.bio,
         status: formData.status || "pending",
         avatar_url: null,
-        specialties: selectedSpecialties,
+        specialties: formData.specialties || [],
       };
 
       setTutors((current) => [newTutor, ...current]);
@@ -108,15 +95,11 @@ export default function TutorsPage() {
     setUpdatingTutor(true);
 
     try {
-      const selectedSpecialties = availableSpecialties.filter((specialty) =>
-        formData.specialty_ids.includes(specialty.id),
-      );
-
       const updatedTutor = {
         ...tutorToEdit,
         ...formData,
         full_name: `${formData.first_name} ${formData.last_name}`,
-        specialties: selectedSpecialties,
+        specialties: formData.specialties || [],
       };
 
       setTutors((current) =>
@@ -249,7 +232,6 @@ export default function TutorsPage() {
 
       {showAddModal && (
         <AddTutorModal
-          specialties={availableSpecialties}
           isSubmitting={creatingTutor}
           onClose={() => {
             if (!creatingTutor) {
@@ -263,7 +245,6 @@ export default function TutorsPage() {
       {tutorToEdit && (
         <EditTutorModal
           tutor={tutorToEdit}
-          specialties={availableSpecialties}
           isSubmitting={updatingTutor}
           onClose={() => {
             if (!updatingTutor) {
@@ -461,18 +442,30 @@ function SpecialtyList({ specialties = [] }) {
 
   return (
     <div className="flex max-w-[300px] flex-wrap gap-2">
-      {specialties.map((specialty) => (
-        <span
-          key={specialty.id}
-          className="rounded-full px-3 py-1 text-xs font-semibold"
-          style={{
-            color: specialty.color || "#0B2D8A",
-            backgroundColor: hexToRgba(specialty.color || "#0B2D8A", 0.1),
-          }}
-        >
-          {specialty.name}
-        </span>
-      ))}
+      {specialties.map((specialty, index) => {
+        const name =
+          typeof specialty === "string" ? specialty : specialty?.name || "";
+
+        const color =
+          typeof specialty === "string"
+            ? "#0B2D8A"
+            : specialty?.color || "#0B2D8A";
+
+        if (!name) return null;
+
+        return (
+          <span
+            key={`${name}-${index}`}
+            className="rounded-full px-3 py-1 text-xs font-semibold"
+            style={{
+              color,
+              backgroundColor: hexToRgba(color, 0.1),
+            }}
+          >
+            {name}
+          </span>
+        );
+      })}
     </div>
   );
 }

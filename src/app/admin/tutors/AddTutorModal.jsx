@@ -31,7 +31,6 @@ const fallbackTimezones = [
 ];
 
 export default function AddTutorModal({
-  specialties = [],
   onClose,
   onAddTutor,
   isSubmitting = false,
@@ -50,7 +49,8 @@ export default function AddTutorModal({
     bio: "",
   });
 
-  const [selectedSpecialtyIds, setSelectedSpecialtyIds] = useState([]);
+  const [specialtyInput, setSpecialtyInput] = useState("");
+  const [specialties, setSpecialties] = useState([]);
 
   const timezoneOptions = useMemo(() => {
     try {
@@ -71,6 +71,37 @@ export default function AddTutorModal({
       ...current,
       [name]: value,
     }));
+  }
+
+  function addSpecialty() {
+    const value = specialtyInput.trim();
+
+    if (!value) return;
+
+    const alreadyExists = specialties.some(
+      (specialty) => specialty.toLowerCase() === value.toLowerCase(),
+    );
+
+    if (alreadyExists) {
+      setSpecialtyInput("");
+      return;
+    }
+
+    setSpecialties((current) => [...current, value]);
+    setSpecialtyInput("");
+  }
+
+  function removeSpecialty(specialtyToRemove) {
+    setSpecialties((current) =>
+      current.filter((specialty) => specialty !== specialtyToRemove),
+    );
+  }
+
+  function handleSpecialtyKeyDown(event) {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      addSpecialty();
+    }
   }
 
   function toggleAvailabilityDay(day) {
@@ -103,7 +134,7 @@ export default function AddTutorModal({
     formData.available_days.length > 0 &&
     validTimeRange &&
     formData.qualification.trim() &&
-    selectedSpecialtyIds.length > 0 &&
+    specialties.length > 0 &&
     !isSubmitting;
 
   async function handleSubmit(event) {
@@ -123,7 +154,7 @@ export default function AddTutorModal({
       qualification: formData.qualification.trim(),
       experience: formData.experience.trim() || null,
       bio: formData.bio.trim() || null,
-      specialty_ids: selectedSpecialtyIds,
+      specialties,
       avatar_url: null,
       status: "pending",
     });
@@ -307,31 +338,61 @@ export default function AddTutorModal({
           </div>
 
           <div>
-            <label className="mb-3 block text-sm font-semibold text-gray-700">
+            <label
+              htmlFor="specialty-input"
+              className="mb-2 block text-sm font-semibold text-gray-700"
+            >
               Specialties *
             </label>
 
-            <div className="flex flex-wrap gap-2">
-              {specialties.map((specialty) => {
-                const selected = selectedSpecialtyIds.includes(specialty.id);
+            <div className="flex gap-2">
+              <input
+                id="specialty-input"
+                type="text"
+                value={specialtyInput}
+                onChange={(event) => setSpecialtyInput(event.target.value)}
+                onKeyDown={handleSpecialtyKeyDown}
+                disabled={isSubmitting}
+                placeholder="e.g. Mathematics"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none placeholder:text-gray-400 focus:border-[#0b2d8a] focus:ring-2 focus:ring-[#0b2d8a]/20"
+              />
 
-                return (
-                  <button
-                    key={specialty.id}
-                    type="button"
-                    onClick={() => toggleSpecialty(specialty.id)}
-                    disabled={isSubmitting}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                      selected
-                        ? "border-[#0b2d8a] bg-[#0b2d8a] text-white"
-                        : "border-gray-200 text-gray-600 hover:border-[#0b2d8a]"
-                    }`}
-                  >
-                    {specialty.name}
-                  </button>
-                );
-              })}
+              <button
+                type="button"
+                onClick={addSpecialty}
+                disabled={!specialtyInput.trim() || isSubmitting}
+                className="rounded-xl bg-[#0b2d8a] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#09246f] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Add
+              </button>
             </div>
+
+            <p className="mt-2 text-xs text-gray-500">
+              Press Enter or comma to add a specialty.
+            </p>
+
+            {specialties.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {specialties.map((specialty) => (
+                  <span
+                    key={specialty}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0b2d8a]/10 px-3 py-1.5 text-sm font-semibold text-[#0b2d8a]"
+                  >
+                    {specialty}
+
+                    <button
+                      type="button"
+                      onClick={() => removeSpecialty(specialty)}
+                      disabled={isSubmitting}
+                      aria-label={`Remove ${specialty}`}
+                      className="text-[#0b2d8a]/60 transition hover:text-red-500"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
