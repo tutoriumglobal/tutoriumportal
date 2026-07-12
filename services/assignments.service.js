@@ -125,7 +125,7 @@ export async function getAssignmentFormData() {
       `,
       )
       .in("status", ["active", "pending"])
-      .order("first_name"),
+      .order("created_at", { ascending: false }),
 
     supabase.from("student_subjects").select(`
         student_id,

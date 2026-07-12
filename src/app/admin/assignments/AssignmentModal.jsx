@@ -161,9 +161,9 @@ export default function AssignmentModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="assignment-modal-title"
-        className="flex h-[92vh] w-full max-w-[760px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:h-[790px]"
+        className="flex max-h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
-        <header className="flex shrink-0 items-start justify-between border-b border-gray-100 px-5 py-5 sm:px-8">
+        <header className="flex shrink-0 items-start justify-between border-b border-gray-100 px-5 py-4 sm:px-6">
           <div>
             <h2
               id="assignment-modal-title"
@@ -190,7 +190,7 @@ export default function AssignmentModal({
 
         <AssignmentSteps step={step} />
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
           {step === 1 && (
             <StudentStep
               students={filteredStudents}
@@ -223,7 +223,7 @@ export default function AssignmentModal({
           )}
         </div>
 
-        <footer className="flex shrink-0 flex-col-reverse gap-3 border-t border-gray-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-8">
+        <footer className="flex shrink-0 flex-col-reverse gap-3 border-t border-gray-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
           {step === 1 ? (
             <button
               type="button"
@@ -297,7 +297,7 @@ function AssignmentSteps({ step }) {
   ];
 
   return (
-    <div className="shrink-0 border-b border-gray-100 px-4 py-5 sm:px-8">
+    <div className="shrink-0 border-b border-gray-100 px-4 py-4 sm:px-6">
       <div className="mx-auto flex max-w-[600px] items-start justify-between">
         {steps.map((item, index) => {
           const completed = step > item.number;
@@ -698,12 +698,11 @@ function SimpleEmpty({ emoji, title, text }) {
 }
 
 function calculateTutorMatch({ student, tutor, subject }) {
-  let score = 0;
   const reasons = [];
 
   const normalizedSubject = normalizeText(subject.name);
 
-  const specialtyMatches = (tutor.specialties || []).some((specialty) => {
+  const subjectMatch = (tutor.specialties || []).some((specialty) => {
     const normalizedSpecialty = normalizeText(specialty);
 
     return (
@@ -713,17 +712,27 @@ function calculateTutorMatch({ student, tutor, subject }) {
     );
   });
 
-  if (specialtyMatches) {
-    score += 55;
-    reasons.push("Subject specialist");
+  // Subject is mandatory.
+  // Tutors without the subject should not be ranked as matches.
+  if (!subjectMatch) {
+    return {
+      score: 0,
+      reasons: [],
+      subjectMatch: false,
+      availabilityMatch: false,
+    };
   }
+
+  // Subject match carries most of the score.
+  let score = 70;
+  reasons.push("Subject specialist");
 
   const commonDays = (student.preferred_days || []).filter((day) =>
     (tutor.available_days || []).includes(day),
   );
 
-  if (commonDays.length) {
-    score += Math.min(20, commonDays.length * 5);
+  if (commonDays.length > 0) {
+    score += Math.min(15, commonDays.length * 5);
     reasons.push(`${commonDays.length} matching day(s)`);
   }
 
@@ -734,7 +743,7 @@ function calculateTutorMatch({ student, tutor, subject }) {
   });
 
   if (timeOverlap) {
-    score += 20;
+    score += 10;
     reasons.push("Time overlap");
   }
 
@@ -750,7 +759,7 @@ function calculateTutorMatch({ student, tutor, subject }) {
   return {
     score: Math.min(score, 100),
     reasons,
-    subjectMatch: specialtyMatches,
+    subjectMatch: true,
     availabilityMatch: commonDays.length > 0 && timeOverlap,
   };
 }
