@@ -87,7 +87,7 @@ export default function AdminLayout({ children }) {
           </nav>
 
           <div className="border-t border-white/10 px-5 py-6">
-            <Link
+            {/* <Link
               href="#"
               onClick={() => setOpen(false)}
               className={`mb-6 flex items-center gap-4 rounded-xl px-4 py-3 text-[15px] font-semibold transition ${
@@ -98,7 +98,7 @@ export default function AdminLayout({ children }) {
             >
               <FaCog />
               Settings
-            </Link>
+            </Link> */}
 
             <div className="flex items-center gap-3 px-4">
               <div className="h-10 w-10 rounded-full bg-[#fdbd01]" />
