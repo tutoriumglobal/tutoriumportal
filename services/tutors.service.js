@@ -102,42 +102,41 @@ export async function updateTutor(tutorId, tutorData) {
     throw new Error("Tutor ID is required.");
   }
 
-  const payload = {
-    first_name: tutorData.first_name.trim(),
-    last_name: tutorData.last_name.trim(),
-    email: tutorData.email.trim().toLowerCase(),
-    phone: tutorData.phone?.trim() || null,
+  const response = await fetch(`/api/tutors/${tutorId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      first_name: tutorData.first_name,
+      last_name: tutorData.last_name,
+      email: tutorData.email,
+      phone: tutorData.phone,
+      timezone: tutorData.timezone,
+      available_days: tutorData.available_days,
+      available_start_time: tutorData.available_start_time,
+      available_end_time: tutorData.available_end_time,
+      qualification: tutorData.qualification,
+      experience: tutorData.experience,
+      bio: tutorData.bio,
+      specialties: tutorData.specialties,
+      avatar_url: tutorData.avatar_url,
+      status: tutorData.status,
+    }),
+  });
 
-    timezone: tutorData.timezone,
+  const result = await response.json();
 
-    available_days: tutorData.available_days || [],
-    available_start_time: tutorData.available_start_time,
-    available_end_time: tutorData.available_end_time,
-
-    qualification: tutorData.qualification.trim(),
-    experience: tutorData.experience?.trim() || null,
-    bio: tutorData.bio?.trim() || null,
-
-    specialties: tutorData.specialties || [],
-
-    avatar_url: tutorData.avatar_url || null,
-    status: tutorData.status || "pending",
-
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from("tutors")
-    .update(payload)
-    .eq("id", tutorId)
-    .select()
-    .single();
-
-  if (error) {
-    throw error;
+  if (!response.ok || !result.success) {
+    throw new Error(result.message || "Unable to update tutor.");
   }
 
-  return normalizeTutor(data);
+  return {
+    tutor: result.tutor,
+    emailSent: result.email_sent === true,
+    warning: result.warning || null,
+  };
 }
 
 /**

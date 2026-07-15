@@ -126,25 +126,27 @@ export default function TutorsPage() {
     setUpdatingTutor(true);
 
     try {
-      const updatedTutor = await updateTutor(tutorToEdit.id, formData);
+      const result = await updateTutor(tutorToEdit.id, formData);
 
       setTutors((current) =>
         current.map((tutor) =>
-          tutor.id === updatedTutor.id ? updatedTutor : tutor,
+          tutor.id === result.tutor.id ? result.tutor : tutor,
         ),
       );
 
       setTutorToEdit(null);
 
-      toast.success("Tutor updated successfully.");
+      if (result.warning) {
+        toast.warning(result.warning);
+      } else if (result.emailSent) {
+        toast.success("Tutor activated and profile email sent successfully.");
+      } else {
+        toast.success("Tutor updated successfully.");
+      }
     } catch (error) {
       console.error("Unable to update tutor:", error);
 
-      if (error?.code === "23505") {
-        toast.error("A tutor with this email already exists.");
-      } else {
-        toast.error(error?.message || "Unable to update tutor.");
-      }
+      toast.error(error?.message || "Unable to update tutor.");
     } finally {
       setUpdatingTutor(false);
     }
