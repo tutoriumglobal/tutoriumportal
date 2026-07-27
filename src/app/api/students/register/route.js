@@ -297,41 +297,6 @@ export async function POST(request) {
     }
 
     /*
-     * Check whether the email already has a student
-     * registration.
-     */
-    const { data: existingStudent, error: lookupError } = await supabase
-      .from("students")
-      .select("id, email, status")
-      .eq("email", studentPayload.email)
-      .maybeSingle();
-
-    if (lookupError) {
-      console.error("Student duplicate check failed:", lookupError);
-
-      return jsonResponse(
-        request,
-        {
-          success: false,
-          message: "Unable to process the registration at this time.",
-        },
-        500,
-      );
-    }
-
-    if (existingStudent) {
-      return jsonResponse(
-        request,
-        {
-          success: false,
-          message:
-            "A student registration already exists for this email address.",
-        },
-        409,
-      );
-    }
-
-    /*
      * Create the student first.
      */
     const { data: createdStudent, error: studentError } = await supabase
@@ -354,18 +319,6 @@ export async function POST(request) {
 
     if (studentError) {
       console.error("Student registration insert failed:", studentError);
-
-      if (studentError.code === "23505") {
-        return jsonResponse(
-          request,
-          {
-            success: false,
-            message:
-              "A student registration already exists for this email address.",
-          },
-          409,
-        );
-      }
 
       return jsonResponse(
         request,
