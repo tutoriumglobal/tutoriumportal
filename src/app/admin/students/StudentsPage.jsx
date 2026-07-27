@@ -120,12 +120,7 @@ export default function StudentsPage() {
       toast.success("Student added successfully.");
     } catch (error) {
       console.error("Unable to add student:", error);
-
-      if (error?.code === "23505") {
-        toast.error("A student with this email already exists.");
-      } else {
-        toast.error(error?.message || "Unable to add student.");
-      }
+      toast.error(error?.message || "Unable to add student.");
     } finally {
       setCreatingStudent(false);
     }
@@ -149,12 +144,7 @@ export default function StudentsPage() {
       toast.success("Student updated successfully.");
     } catch (error) {
       console.error("Unable to update student:", error);
-
-      if (error?.code === "23505") {
-        toast.error("A student with this email already exists.");
-      } else {
-        toast.error(error?.message || "Unable to update student.");
-      }
+      toast.error(error?.message || "Unable to update student.");
     } finally {
       setUpdatingStudent(false);
     }
