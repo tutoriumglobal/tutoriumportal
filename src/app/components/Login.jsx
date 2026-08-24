@@ -64,7 +64,7 @@ export default function Login() {
 
               <input
                 type="email"
-                placeholder="admin@tutorium.com"
+                placeholder="example@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-transparent px-3 py-3 text-sm text-gray-700 outline-none"
