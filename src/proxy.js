@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 
-const PUBLIC_PATHS = new Set(["/login", "/api/auth/login"]);
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/api/auth/login",
+  "/api/cron/supabase-keepalive",
+]);
 
 export function proxy(request) {
   const { pathname } = request.nextUrl;
