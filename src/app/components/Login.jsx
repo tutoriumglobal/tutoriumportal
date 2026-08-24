@@ -11,14 +11,30 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    if (email === "admin@tutorium.com" && password === "admin@tutorium.com") {
-      router.push("/admin/dashboard");
-    } else {
-      toast.error("Invalid email or password");
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        toast.error("Invalid email or password");
+        return;
+      }
+
+      router.replace("/admin/dashboard");
+      router.refresh();
+    } catch {
+      toast.error("Unable to sign in. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -89,9 +105,10 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-[#fdbd01] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#e9ae00]"
+            disabled={isSubmitting}
+            className="w-full rounded-lg bg-[#fdbd01] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#e9ae00] disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Sign In →
+            {isSubmitting ? "Signing In..." : "Sign In →"}
           </button>
         </form>
       </div>
